@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+    <title>3D Snake Game.</title>
+    <style>
+            html, body{
+                    padding: 0; margin: 0;
+            }
+    </style>
+</head>
+<body>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r99/three.js"></script>
+    <!-- OR -->
+    <!-- <script src="./three.js"></script> -->
+    
+    <script src="./OrbitControls.js"></script>
+
+    <script>
+
+        // Values collectors for further use.
+        var width = window.innerWidth, height = window.innerHeight;
+        var aspectRatio = width/height;
+        var renderer = new THREE.WebGLRenderer(), camera = new THREE.PerspectiveCamera(45, aspectRatio, 0.1, 1000)
+        var scene= new THREE.Scene();
+        var controls = new THREE.OrbitControls(camera, renderer.domElement);
+        var clock = new THREE.Clock(), text = document.createElement("div");
+        controls.enableKeys = false;
+
+        // pointing.
+        var mov = 5;
+        var delta = 1/mov;
+        var tetha = 0.0, edgeSize = 20, padding = 0.15;
+        var cubeSize = edgeSize + (edgeSize - 1)*padding;
+        var halfCubeSize = cubeSize/2;
+        
+        // decoration;
+        var backgroundColor = 0xffa805, bodyColor = 0x00fc43, headColor = 0xff295b, score = 0;
+
+        // Vector3( x : Float, y : Float, z : Float )
+        var lightPos = [new THREE.Vector3(0,50,20), new THREE.Vector3(0,15,-20), new THREE.Vector3(-20, 15, 20), new THREE.Vector3(20, -15, 0)];
+
+        var end = false, keysQueue = [];
+
+        var snake = [], apple;
+        // design rectangular cuboid;
+        var cube = new THREE.BoxGeometry(1,1,1);
+        var gameCube = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+        var direction = new THREE.Vector3(1, 0, 0);
+
+        scene.background = new THREE.Color( backgroundColor );
+
+        // using Camera class for positioning.
+        camera.position.z = 30;
+        camera.position.y = 30;
+
+        cube.center();
+
+        // Initialize in every new loading.
+        function init()
+        {
+
+            renderer.setSize(width, height);
+            document.body.appendChild(renderer.domElement);
+
+            lightPos.forEach((v)=>{
+                var light = new THREE.PointLight(0xffffff, 1, 100);
+                light.position.set(v.x, v.y, v.z);
+                scene.add(light)
+            });
+
+            for(var i=0; i<5; i++)
+            {
+                var snakeCubeMaterial = new THREE.MeshPhongMaterial({color: (i==4)? headColor: bodyColor});
+                
+                // allocating the position to snake.
+                snake.push(new Cube(new THREE.Vector3((i+1*padding) -halfCubeSize + 0.5, 0.5 + padding/2, 0.5 + padding/2), snakeCubeMaterial, scene));
+            }
+
+            // deisgn apple for the snake.
+            var appleCubeMaterial = new THREE.MeshPhongMaterial({color: 0xff2e2e});
+            // generating cube.
+            apple = new Cube(buildAppleVector(), appleCubeMaterial, scene);
+            var edgesMaterial = new THREE.LineBasicMaterial({color: 0xffffff});
+            new Cube(new THREE.Vector3(0,0,0), edgesMaterial, scene, gameCube, true).setPosition(0,0,0)
+
+            // position of SCORE screen and intiallization from 0;
+            text.style.position = "absolute";
+            text.style.width = 200;
+            text.style.height = 100;
+            text.innerHTML = "Score: " + score;
+            text.style.top = 20 + "px";
+            text.style.left = 20 + "px";
+            text.style.fontSize = 50 + "px";
+
+            document.body.appendChild(text);
+
+            clock.startTime = 0.0;
+            render();
+        }
+
+        // call in every restart.
+        function restart()
+        {
+            while(snake.length>5) scene.remove(snake.shift().mesh);
+
+            // reset the position of snake.
+            for(var i = 0; i < snake.length; i++){
+                snake[i].setPosition((i + i * padding) -halfCubeSize + 0.5 , 0.5 + padding / 2, 0.5 + padding / 2 );
+            }
+            end = false;
+            direction = new THREE.Vector3(1,0,0);
+            // start score from 0.
+            text.innerHTML = "Score: " + 0;
+            score = 0;
+            
+        }
+
+        // the default operation on every loading.
+        document.onload = init();
+
+        // generate the feed of the snake.
+        function buildAppleVector()
+        {
+            var x = randInRange(0, edgeSize - 1), y =  randInRange(0, edgeSize - 1), z =  randInRange(0, edgeSize - 1);
+            return new THREE.Vector3(x + x*padding -halfCubeSize + 0.5, y + y * padding -halfCubeSize + 0.5, z + z * padding -halfCubeSize + 0.5);
+        }
+
+        // Design the body of cube.
+        function Cube(vec, material, scene, geometry, renderWireframe)
+        {
+            // if brower doesn't have geometry type then, we will assign.
+            this.geometry = typeof geometry === 'undefined' ? cube: geometry;
+            this.mesh = new THREE.Mesh(this.geometry, material);
+
+            // design the square wireframe or boundary of the snake.
+            if(typeof renderWireframe === 'undefined' || !renderWireframe){
+                this.mesh.position.set(vec.x, vec.y, vec.z);
+                scene.add(this.mesh);
+            }
+            else {
+                var edges = new THREE.EdgesGeometry( this.mesh.geometry );
+                scene.add(new THREE.LineSegments( edges, material ));
+            }
+
+            this.setPosition = function(vec){
+                this.mesh.position.set(vec.x, vec.y, vec.z);
+            };
+        }
+
+        function randInRange(a, b){
+            return a + Math.floor((b - a) * Math.random());
+        }
+
+        // Transmitting a value after single operation;
+        function render(){
+            // tell the browser the update and perform the animation frame by callback;
+            requestAnimationFrame(render);
+            
+            // snake.
+            tetha += clock.getDelta();
+            
+            // moving the snake.
+            if(tetha > delta){
+                var tail = snake.shift();
+                var head = snake[snake.length - 1];
+
+                // snake color.
+                head.mesh.material.color.setHex(bodyColor);
+                tail.mesh.material.color.setHex(headColor);
+
+                // snake path.
+                direction = keysQueue.length > 0 ? keysQueue.pop(0) : direction;
+                var newPosition = new THREE.Vector3(head.mesh.position.x + direction.x + Math.sign(direction.x) * padding, head.mesh.position.y + direction.y + Math.sign(direction.y) * padding, head.mesh.position.z + direction.z + Math.sign(direction.z) * padding);
+                tail.setPosition(newPosition);
+                
+                snake.push(tail);
+                head = tail;
+
+                // when snake crash by their body.
+                for(var i = snake.length - 2; i > -1; i--){
+                    if(head.mesh.position.distanceTo(snake[i].mesh.position) < 1){
+                        end = true;
+                        break;
+                    }
+                }
+
+                if(end) {
+                    restart();
+                }
+                // when snake reach the apple.
+                if(head.mesh.position.distanceTo(apple.mesh.position) < 1){
+                    apple.setPosition(spawnAppleVector());
+                    text.innerHTML = "Score: " + (++score);
+
+                    snake.unshift(new Cube( new THREE.Vector3(snake[0].mesh.position.x, snake[0].mesh.position.y, snake[0].mesh.position.z), new THREE.MeshPhongMaterial( { color: 0x388e3c} ), scene));
+
+                }
+
+                // if snake come to center area of across boundary horizontally.
+                if(head.mesh.position.x < -halfCubeSize){
+                    head.mesh.position.x = halfCubeSize - 0.5;
+                }
+                // snake reach the end point of the boudary horizontally.
+                else if(head.mesh.position.x > halfCubeSize){
+                    head.mesh.position.x = -halfCubeSize + 0.5;
+                }
+                // if snake come to center area of across boundary vertically.
+                else if(head.mesh.position.y < -halfCubeSize){
+                    head.mesh.position.y = halfCubeSize - 0.5;
+                }
+                // snake reach the end point of the boudary vertically.
+                else if(head.mesh.position.y > halfCubeSize){
+                    head.mesh.position.y = -halfCubeSize + 0.5;
+                }
+                // if snake come to center area of across boundary in Z-direction.
+                else if(head.mesh.position.z < -halfCubeSize){
+                    head.mesh.position.z = halfCubeSize - 0.5;
+                }
+                // snake reach the end point of the boudary Z-direction.
+                else if(head.mesh.position.z > halfCubeSize){
+                    head.mesh.position.z = -halfCubeSize + 0.5;
+                }
+
+                tetha = 0;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // key sets to operate the snake.
+        document.addEventListener("keydown", function(e){
+            switch(e.key){
+                case 'w':
+                    keysQueue.push(new THREE.Vector3(0,1,0));
+                break;
+                case 'a':
+                    keysQueue.push(new THREE.Vector3(0,-1,0));
+                break;
+                case "ArrowDown":
+                    keysQueue.push(new THREE.Vector3(0,0,1));
+                break;
+                case "ArrowUp":
+                    keysQueue.push(new THREE.Vector3(0,0,-1));
+                break;
+                case "ArrowLeft":
+                    keysQueue.push(new THREE.Vector3(-1,0,0));
+                break;
+                case "ArrowRight":
+                    keysQueue.push(new THREE.Vector3(1,0,0));
+                break;
+            }
+        });
+
+    </script>
+
+</body>
+</html>
