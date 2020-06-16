@@ -10,15 +10,24 @@
             html, body{
                     padding: 0; margin: 0;
             }
+            .slider{
+                margin-left: 45vw;
+            }
+            #para{margin-left: 47.5vw;}
     </style>
 </head>
 <body>
-
+  
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r99/three.js"></script>
     <!-- OR -->
     <!-- <script src="./three.js"></script> -->
     
     <script src="./OrbitControls.js"></script>
+
+    <div class="slidecontainer" id="slider">
+        <input type="range" min="1" max="20" value='0' class="slider" id="myRange" autofocus="OFF">
+        <p id="para">Speed: <span id="demo"></span></p>
+    </div>
 
     <script>
 
@@ -87,6 +96,7 @@
             apple = new Cube(buildAppleVector(), appleCubeMaterial, scene);
             var edgesMaterial = new THREE.LineBasicMaterial({color: 0xffffff});
             new Cube(new THREE.Vector3(0,0,0), edgesMaterial, scene, gameCube, true).setPosition(0,0,0)
+
 
             // position of SCORE screen and intiallization from 0;
             text.style.position = "absolute";
@@ -161,9 +171,21 @@
             // tell the browser the update and perform the animation frame by callback;
             requestAnimationFrame(render);
             
-            // snake.
-            tetha += clock.getDelta();
-            
+            // snake speed.
+            // tetha += clock.getDelta();
+
+                // The controllable snake speed.
+                let slider = document.getElementById('myRange');
+                let feasibleValue = slider.value / 100;
+                tetha += feasibleValue
+                // Displaying the current speed of snake.
+                var output = document.getElementById("demo");
+                output.innerHTML = slider.value;
+
+                slider.oninput = function() {
+                    output.innerHTML = this.value;
+                }
+
             // moving the snake.
             if(tetha > delta){
                 var tail = snake.shift();
@@ -257,6 +279,6 @@
         });
 
     </script>
-
+  
 </body>
 </html>
